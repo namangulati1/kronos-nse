@@ -16,4 +16,9 @@ pyarrow>=14.0.0
 python-dotenv>=1.0.0
 pytest>=8.0.0
 
+# Web UI Dashboard deps
+streamlit>=1.30.0
+plotly>=5.18.0
+
+
 

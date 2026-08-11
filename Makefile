@@ -1,10 +1,11 @@
 PY ?= python3
 
-.PHONY: help setup install data demo eval backtest all test clean
+.PHONY: help setup install data demo eval backtest all test clean ui
 
 help:
 	@echo "make install    - pip install requirements"
 	@echo "make setup      - clone upstream Kronos + check environment"
+	@echo "make ui         - launch interactive Web Dashboard on browser"
 	@echo "make data       - download and cache NSE OHLCV"
 	@echo "make demo       - one-window forecast + fan chart per symbol"
 	@echo "make eval       - walk-forward forecast evaluation (slow)"
@@ -19,8 +20,12 @@ install:
 setup:
 	$(PY) scripts/00_setup.py
 
+ui:
+	$(PY) -m streamlit run app.py
+
 data:
 	$(PY) scripts/01_fetch_data.py
+
 
 demo:
 	$(PY) scripts/02_demo_forecast.py
