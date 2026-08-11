@@ -1,0 +1,68 @@
+# ---------------------------------------------------------------------------
+# Kronos NSE testbench - default configuration
+# ---------------------------------------------------------------------------
+
+data:
+  # NSE symbols in Yahoo Finance notation. Indices use the ^ prefix, cash
+  # equities use the .NS suffix (.BO for BSE).
+  symbols:
+    - "^NSEI"          # NIFTY 50
+    - "^NSEBANK"       # NIFTY BANK
+    - "RELIANCE.NS"
+    - "HDFCBANK.NS"
+    - "INFY.NS"
+    - "TCS.NS"
+    - "ICICIBANK.NS"
+    - "ITC.NS"
+  interval: "1d"        # 1d | 60m | 15m | 5m  (intraday is capped at ~60 days by Yahoo)
+  start: "2010-01-01"   # ignored for intraday
+  end: null             # null = today
+  auto_adjust: true     # adjust OHLC for splits/bonus. Keep TRUE for NSE:
+                        # un-adjusted series contain fake -50% gaps on split days.
+  cache_dir: "data/cache"
+
+model:
+  # Pretrained checkpoints on the HF Hub (NeoQuasar org).
+  #   Kronos-mini  -  4.1M params, context 2048, pair with Kronos-Tokenizer-2k
+  #   Kronos-small - 24.7M params, context 512,  pair with Kronos-Tokenizer-base
+  #   Kronos-base  - 102.3M params, context 512,  pair with Kronos-Tokenizer-base
+  name: "NeoQuasar/Kronos-small"
+  tokenizer: "NeoQuasar/Kronos-Tokenizer-base"
+  max_context: 512
+  device: "auto"        # auto | cuda:0 | mps | cpu
+  clip: 5
+
+forecast:
+  lookback: 400         # context bars fed to the model (must be <= max_context)
+  horizon: 5            # bars to forecast (5 trading days ~ one week)
+  n_samples: 30         # Monte-Carlo paths per window. Kronos is a *sampling*
+                        # model - a single path is close to meaningless.
+  temperature: 1.0
+  top_p: 0.90
+  top_k: 0
+  sample_batch: 30      # paths per forward pass; lower this if you hit OOM
+
+evaluate:
+  # IMPORTANT: Kronos was pretrained on data up to ~mid-2025 across 45 global
+  # exchanges, which includes Indian venues. Anything before the cutoff is
+  # contaminated. Keep this start date at/after the checkpoint release.
+  start: "2025-08-01"
+  end: null
+  stride: 1             # bars between successive decision points
+  max_windows: null     # cap the number of windows (null = no cap)
+  seed: 7
+  out_dir: "results"
+
+backtest:
+  signal: "expected_return"   # expected_return | prob_up | vol_scaled
+  sizing: "threshold"         # sign | threshold | continuous
+  threshold_bps: 25           # dead zone for return-unit signals; below this we stay flat
+  threshold_prob: 0.03        # dead zone when signal == prob_up (probability points)
+  max_leverage: 1.0
+  allow_short: true           # set false to model a long-only cash-equity account
+  overlap: true               # average the last `horizon` decisions into one book
+  execution: "next_open"      # next_open (realistic) | close (optimistic)
+  cost_bps_roundtrip: 25      # NSE delivery equity all-in. See README for the
+                              # breakdown; use ~10 for intraday, ~2 for futures.
+  ann_factor: 252
+  n_bootstrap: 2000

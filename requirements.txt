@@ -1,0 +1,17 @@
+# Core Kronos deps (mirrors upstream shiyu-coder/Kronos requirements.txt)
+torch>=2.0.0
+numpy
+pandas>=2.0
+einops>=0.8.0
+huggingface_hub>=0.33.0
+safetensors>=0.4.0
+tqdm>=4.66.0
+
+# Testbench deps
+yfinance>=0.2.54
+pyyaml>=6.0
+matplotlib>=3.8.0
+scipy>=1.11.0
+pyarrow>=14.0.0
+python-dotenv>=1.0.0
+
