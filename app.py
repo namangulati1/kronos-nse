@@ -7,14 +7,12 @@ and walk-forward backtesting metrics for Indian equities (NSE).
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import streamlit as st
 
 # Add repository root to path
@@ -22,11 +20,9 @@ REPO_ROOT = Path(__file__).resolve().parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from kronos_nse import data as nse_data
-from kronos_nse.config import load_config
-from kronos_nse.predictor import KronosRunner, resolve_device
-from kronos_nse.backtest import run_backtest, score_forecasts
-from kronos_nse import vendor
+from kronos_nse import data as nse_data  # noqa: E402
+from kronos_nse.config import load_config  # noqa: E402
+from kronos_nse.predictor import KronosRunner, resolve_device  # noqa: E402
 
 # Page Config
 st.set_page_config(
@@ -142,17 +138,17 @@ tab1, tab2, tab3 = st.tabs(["📈 Live Generative Forecast", "📊 Backtest & St
 # TAB 1: LIVE FORECAST
 with tab1:
     st.subheader(f"Forecast Dashboard: {symbol}")
-    
+
     # Run Forecast Button or Auto-run
     if st.button("🚀 Generate Stochastic Forecast", type="primary") or "last_forecast" not in st.session_state:
         with st.spinner("Generating Monte-Carlo forecast paths via Kronos..."):
             context_df = df.iloc[-lookback:]
             last_dt = context_df.index[-1]
             last_close = float(context_df["close"].iloc[-1])
-            
+
             # Create future DatetimeIndex (bdate)
             future_dates = pd.bdate_range(start=last_dt + pd.Timedelta(days=1), periods=horizon)
-            
+
             if use_synthetic_model:
                 # Random forecast simulation
                 paths = np.zeros((n_samples, horizon, 6))
@@ -204,11 +200,11 @@ with tab1:
         paths = fc["paths"]
         last_close = fc["last_close"]
         last_dt = fc["last_dt"]
-        
+
         # Extract close paths (K, H)
         close_paths = paths[:, :, 3]
         term_returns = np.log(np.clip(close_paths[:, -1], 1e-9, None) / last_close)
-        
+
         p_up = float(np.mean(term_returns > 0.0))
         mean_target = float(np.mean(close_paths[:, -1]))
         exp_logret = float(np.mean(term_returns))
@@ -216,10 +212,10 @@ with tab1:
         q25 = float(np.quantile(close_paths[:, -1], 0.25))
         q75 = float(np.quantile(close_paths[:, -1], 0.75))
         q95 = float(np.quantile(close_paths[:, -1], 0.95))
-        
+
         # Metrics Display Grid
         m1, m2, m3, m4, m5 = st.columns(5)
-        
+
         m1.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">Last Close Price</div>
@@ -227,7 +223,7 @@ with tab1:
             <div style="font-size:0.75rem; color:#90a4ae;">{last_dt.strftime('%d %b %Y')}</div>
         </div>
         """, unsafe_allow_html=True)
-        
+
         m2.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">Expected Target ({horizon}d)</div>
@@ -235,7 +231,7 @@ with tab1:
             <div style="font-size:0.75rem;" class="{'bullish' if exp_logret >= 0 else 'bearish'}">{exp_logret*100:+.2f}% Log Return</div>
         </div>
         """, unsafe_allow_html=True)
-        
+
         p_up_class = "bullish" if p_up >= 0.55 else ("bearish" if p_up <= 0.45 else "neutral")
         m3.markdown(f"""
         <div class="metric-card">
@@ -244,11 +240,11 @@ with tab1:
             <div style="font-size:0.75rem; color:#90a4ae;">across {n_samples} paths</div>
         </div>
         """, unsafe_allow_html=True)
-        
+
         # Volatility
         step_returns = np.diff(np.log(np.clip(np.concatenate([np.full((n_samples, 1), last_close), close_paths], axis=1), 1e-9, None)), axis=1)
         ann_vol = float(np.mean(np.std(step_returns, axis=1, ddof=1))) * np.sqrt(252) * 100
-        
+
         m4.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">Predicted Ann. Volatility</div>
@@ -256,7 +252,7 @@ with tab1:
             <div style="font-size:0.75rem; color:#90a4ae;">stochastic path spread</div>
         </div>
         """, unsafe_allow_html=True)
-        
+
         m5.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">90% Confidence Interval</div>
@@ -264,67 +260,67 @@ with tab1:
             <div style="font-size:0.75rem; color:#90a4ae;">q05 to q95 bounds</div>
         </div>
         """, unsafe_allow_html=True)
-        
+
         st.markdown("---")
-        
+
         # Plotly Interactive Fan Chart
         hist_view = context_df.iloc[-90:] # trailing 90 bars
         hist_dates = hist_view.index
-        
+
         fig = go.Figure()
-        
+
         # Historical Close trace
         fig.add_trace(go.Scatter(
             x=hist_dates,
             y=hist_view["close"],
             mode="lines",
             name="Historical Close",
-            line=dict(color="#2962FF", width=2.5),
+            line={"color": "#2962FF", "width": 2.5},
         ))
-        
+
         # Anchor point connecting context end to forecast
-        concat_dates = pd.DatetimeIndex([last_dt] + list(future_dates))
-        
+        concat_dates = pd.DatetimeIndex([last_dt, *list(future_dates)])
+
         # Quantile Bands (5th to 95th)
         q05_band = np.concatenate([[last_close], np.quantile(close_paths, 0.05, axis=0)])
         q95_band = np.concatenate([[last_close], np.quantile(close_paths, 0.95, axis=0)])
         q25_band = np.concatenate([[last_close], np.quantile(close_paths, 0.25, axis=0)])
         q75_band = np.concatenate([[last_close], np.quantile(close_paths, 0.75, axis=0)])
         median_band = np.concatenate([[last_close], np.median(close_paths, axis=0)])
-        
+
         # 90% CI shaded area
         fig.add_trace(go.Scatter(
-            x=concat_dates, y=q95_band, mode="lines", line=dict(width=0), showlegend=False, hoverinfo="skip"
+            x=concat_dates, y=q95_band, mode="lines", line={"width": 0}, showlegend=False, hoverinfo="skip"
         ))
         fig.add_trace(go.Scatter(
             x=concat_dates, y=q05_band, mode="lines", fill="tonexty",
-            fillcolor="rgba(41, 98, 255, 0.15)", line=dict(width=0), name="90% Quantile Range (q05-q95)"
+            fillcolor="rgba(41, 98, 255, 0.15)", line={"width": 0}, name="90% Quantile Range (q05-q95)"
         ))
-        
+
         # 50% CI shaded area
         fig.add_trace(go.Scatter(
-            x=concat_dates, y=q75_band, mode="lines", line=dict(width=0), showlegend=False, hoverinfo="skip"
+            x=concat_dates, y=q75_band, mode="lines", line={"width": 0}, showlegend=False, hoverinfo="skip"
         ))
         fig.add_trace(go.Scatter(
             x=concat_dates, y=q25_band, mode="lines", fill="tonexty",
-            fillcolor="rgba(0, 230, 118, 0.2)", line=dict(width=0), name="50% Quantile Range (q25-q75)"
+            fillcolor="rgba(0, 230, 118, 0.2)", line={"width": 0}, name="50% Quantile Range (q25-q75)"
         ))
-        
+
         # Individual Paths (thin translucent lines)
         for i in range(min(15, n_samples)):
             path_i = np.concatenate([[last_close], close_paths[i]])
             fig.add_trace(go.Scatter(
                 x=concat_dates, y=path_i, mode="lines",
-                line=dict(color="rgba(255, 255, 255, 0.25)", width=1),
+                line={"color": "rgba(255, 255, 255, 0.25)", "width": 1},
                 name=f"Sample Path {i+1}", showlegend=(i == 0)
             ))
-            
+
         # Median Line
         fig.add_trace(go.Scatter(
             x=concat_dates, y=median_band, mode="lines+markers",
-            line=dict(color="#00E676", width=3, dash="dash"), name="Median Forecast Path"
+            line={"color": "#00E676", "width": 3, "dash": "dash"}, name="Median Forecast Path"
         ))
-        
+
         fig.update_layout(
             title=f"<b>{symbol}</b> — Generative Fan Chart ({n_samples} Monte-Carlo Paths, {horizon}-Day Horizon)",
             template="plotly_dark",
@@ -332,10 +328,10 @@ with tab1:
             yaxis_title="Price (INR)",
             height=540,
             hovermode="x unified",
-            margin=dict(l=40, r=40, t=60, b=40),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            margin={"l": 40, "r": 40, "t": 60, "b": 40},
+            legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1},
         )
-        
+
         st.plotly_chart(fig, use_container_width=True)
 
 # TAB 2: BACKTEST & STRATEGY
@@ -344,12 +340,12 @@ with tab2:
     st.markdown("""
     Evaluate strategy performance under realistic NSE transaction costs (**25 bps roundtrip**) and **`next_open` execution**.
     """)
-    
+
     col_bt1, col_bt2, col_bt3 = st.columns(3)
     bt_start = col_bt1.date_input("Evaluation Start Date", value=pd.to_datetime("2025-08-01"))
     cost_bps = col_bt2.number_input("Roundtrip Cost (bps)", min_value=0, max_value=100, value=25)
     allow_short = col_bt3.checkbox("Allow Short Selling", value=True)
-    
+
     if st.button("📊 Run Strategy Backtest"):
         st.info("Loading cached backtest simulation...")
         # Synthetic backtest visualization demonstration
@@ -358,14 +354,14 @@ with tab2:
             np.random.seed(42)
             strat_ret = np.random.normal(0.0006, 0.009, size=len(dates))
             bench_ret = np.random.normal(0.0004, 0.010, size=len(dates))
-            
+
             strat_cum = np.cumprod(1 + strat_ret)
             bench_cum = np.cumprod(1 + bench_ret)
-            
+
             bt_fig = go.Figure()
-            bt_fig.add_trace(go.Scatter(x=dates, y=strat_cum, mode="lines", name="Kronos Strategy", line=dict(color="#00E676", width=2.5)))
-            bt_fig.add_trace(go.Scatter(x=dates, y=bench_cum, mode="lines", name="NIFTY Buy & Hold", line=dict(color="#90a4ae", width=1.5, dash="dash")))
-            
+            bt_fig.add_trace(go.Scatter(x=dates, y=strat_cum, mode="lines", name="Kronos Strategy", line={"color": "#00E676", "width": 2.5}))
+            bt_fig.add_trace(go.Scatter(x=dates, y=bench_cum, mode="lines", name="NIFTY Buy & Hold", line={"color": "#90a4ae", "width": 1.5, "dash": "dash"}))
+
             bt_fig.update_layout(
                 title="Cumulative Equity Curve (Strategy vs Benchmark)",
                 template="plotly_dark",
@@ -373,7 +369,7 @@ with tab2:
                 height=450,
             )
             st.plotly_chart(bt_fig, use_container_width=True)
-            
+
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("CAGR", f"{(strat_cum[-1]**(252/len(dates))-1)*100:.2f}%")
             c2.metric("Sharpe Ratio", "1.42")
